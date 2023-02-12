@@ -139,16 +139,12 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
           break;
         }
         // Get nth bit of sprite
-
         bool sprite_bit = (sprite >> (j)) & 1;
 
-        if (state->display[vy][xvx] && sprite_bit) {
-          state->display[vy][xvx] = false;
-          state->regs[0xf] = 1;
-        } else if (sprite_bit && !state->display[vy][xvx]) {
-          state->display[vy][xvx] = true;
-        }
         // If the sprite has an "on" pixel, flip the display bit
+        if (sprite_bit) {
+          state->display[vy][xvx] = !state->display[vy][xvx];
+        }
         xvx++;
       }
       vy++;
