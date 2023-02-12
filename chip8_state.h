@@ -10,6 +10,7 @@
 #define CHIP8_WIDTH 64
 #define CHIP8_HEIGHT 32
 #define CHIP8_SDL_SCALE 10
+#define CHIP8_LOAD_OFFSET 0x200
 
 typedef struct chip8_state_t {
   SDL_Window *window;
@@ -30,7 +31,7 @@ typedef struct chip8_state_t {
   uint8_t regs[16];
   // This isn't actually that useful,
   // but just... it could be before we implement some stuff.
-  uint8_t program_size;
+  uint16_t program_size;
   // the stack.
   struct stack_t *execution_stack;
 } chip8_state;

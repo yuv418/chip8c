@@ -27,7 +27,8 @@ struct chip8_state_t *chip8_state_init() {
   // Alloc 4096 bytes of memory
   state->memory = malloc(4096);
   // Assume program is loaded starting at 0x0
-  state->pc = 0x0;
+  state->pc = CHIP8_LOAD_OFFSET;
+  state->program_size = 0x0;
   // Clear all the state
   state->i = 0x0;
   state->delay_timer = 0x0;
@@ -36,6 +37,10 @@ struct chip8_state_t *chip8_state_init() {
     state->regs[i] = 0;
   }
   state->execution_stack = NULL;
+
+  // Load fonts into memory between 0x50 and 0x9f
+  // Can do sizeof since chip8 is a byte array
+  memcpy(state->memory + 0x50, chip8_font, sizeof(chip8_font));
 
   return state;
 }
@@ -51,6 +56,7 @@ void chip8_state_free(struct chip8_state_t *state) {
 
 bool chip8_instruction_decode(struct chip8_state_t *state) {
   // REMOVE THIS (also it looks to not even work right)
+  // printf("%d , %d\n", state->pc, state->program_size);
   if (state->pc > state->program_size) {
     return true;
   }
@@ -62,7 +68,9 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
   uint16_t inst = (inst1 << 8) + inst2;
   state->pc += 2;
 
-  printf("Instruction: 0x%x\n", inst);
+  if (inst != 0x1228) {
+    printf("Instruction: 0x%04x\n", inst);
+  }
 
   // Extract x, y, n, and nnn from the opcode. These will always be in the
   // same places in the opcode
@@ -118,16 +126,34 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     // 64
     uint16_t vx = state->regs[x] % 64;
     uint16_t vy = state->regs[y] % 32;
+    state->regs[0xf] = 1;
+    printf("vx, vy, n %d %d %d\n", vx, vy, n);
+    printf("i reg 0x%x\n", state->i);
     // Draw n tall pixels
-    for (int i = 0; i < n; i++) {
+    for (int i = state->i; i < state->i + n; i++) {
       // Sprite is 8 horizontal bits
-      for (int j = state->i; j < 8; j++) {
-        // If the sprite has an "on" pixel, flip the display bit
-        if (state->memory[j]) {
-          state->display[vy][vx] = !state->display[vy][vx];
+      int xvx = vx;
+      uint8_t sprite = state->memory[i];
+      for (int j = 7; j >= 0; j--) {
+        if (xvx > CHIP8_WIDTH) {
+          break;
         }
+        // Get nth bit of sprite
+
+        bool sprite_bit = (sprite >> (j)) & 1;
+
+        if (state->display[vy][xvx] && sprite_bit) {
+          state->display[vy][xvx] = false;
+          state->regs[0xf] = 1;
+        } else if (sprite_bit && !state->display[vy][xvx]) {
+          state->display[vy][xvx] = true;
+        }
+        // If the sprite has an "on" pixel, flip the display bit
+        xvx++;
       }
+      vy++;
     }
+    break;
   default:
     printf("Unimplemented instruction 0x%x\n", inst);
   }
@@ -136,7 +162,7 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
 
 void chip8_draw_screen(struct chip8_state_t *state) {
   // 10x10 pixel
-  SDL_Rect pixel = {0, 0, 1, 1};
+  SDL_Rect pixel = {0, 0, 10, 10};
   for (int i = 0; i < 64; i++) {
     for (int j = 0; j < 32; j++) {
       pixel.x = (i * 10);

@@ -23,9 +23,9 @@ int main(int argc, char **argv) {
   size_t romfile_len = ftell(romfile);
   rewind(romfile);
 
-  // read the rom into memory starting at the beginning
-  fread(state->memory, romfile_len, 1, romfile);
-  state->program_size = romfile_len;
+  // read the rom into memory starting at 0x200
+  fread(state->memory + CHIP8_LOAD_OFFSET, romfile_len, 1, romfile);
+  state->program_size = CHIP8_LOAD_OFFSET + romfile_len;
   fclose(romfile);
 
   // Main loop
