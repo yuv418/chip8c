@@ -28,14 +28,16 @@ int main(int argc, char **argv) {
   state->program_size = CHIP8_LOAD_OFFSET + romfile_len;
   fclose(romfile);
 
+  state->memory[0x1ff] = 2;
+
   // Main loop
   while (true) {
     // Fetch decode execute
     chip8_instruction_decode(state);
     chip8_draw_screen(state);
-    if (!chip8_handle_event(state)) {
+    /*if (!chip8_handle_event(state)) {
       break;
-    }
+    }*/
     // 700 instructions per second
     usleep(1.0 / 700.0);
   }

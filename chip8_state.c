@@ -46,65 +46,68 @@ struct chip8_state_t *chip8_state_init() {
   return state;
 }
 
-void chip8_get_key(struct chip8_state_t *state) {
+void chip8_get_key(struct chip8_state_t *state, int x) {
   SDL_Event event;
   // Because this doesn't increment the program counter, or something
-  state->pc -= 2;
+  // state->pc -= 2;
   uint8_t key_val = 0x0;
-  if (SDL_WaitEvent(&event)) {
-    if (event.type == SDL_KEYUP) {
-      switch (event.key.keysym.sym) {
-      case SDLK_KP_1:
-        key_val = 0;
-        break;
-      case SDLK_KP_2:
-        key_val = 1;
-        break;
-      case SDLK_KP_3:
-        key_val = 2;
-        break;
-      case SDLK_KP_4:
-        key_val = 3;
-        break;
-      case SDLK_q:
-        key_val = 4;
-        break;
-      case SDLK_w:
-        key_val = 5;
-        break;
-      case SDLK_e:
-        key_val = 6;
-        break;
-      case SDLK_r:
-        key_val = 7;
-        break;
-      case SDLK_a:
-        key_val = 8;
-        break;
-      case SDLK_s:
-        key_val = 9;
-        break;
-      case SDLK_d:
-        key_val = 0xa;
-        break;
-      case SDLK_f:
-        key_val = 0xb;
-        break;
-      case SDLK_z:
-        key_val = 0xc;
-        break;
-      case SDLK_x:
-        key_val = 0xd;
-        break;
-      case SDLK_c:
-        key_val = 0xe;
-        break;
-      case SDLK_v:
-        key_val = 0xf;
-        break;
-      }
-    }
+  while (event.type != SDL_KEYUP) {
+    SDL_WaitEvent(&event);
+    printf("Event handled\n");
   }
+  printf("key %d\n", event.key.keysym.sym);
+  switch (event.key.keysym.sym) {
+  case SDLK_KP_1:
+    key_val = 0;
+    break;
+  case SDLK_KP_2:
+    key_val = 1;
+    break;
+  case SDLK_KP_3:
+    key_val = 2;
+    break;
+  case SDLK_KP_4:
+    key_val = 3;
+    break;
+  case SDLK_q:
+    key_val = 4;
+    break;
+  case SDLK_w:
+    key_val = 5;
+    break;
+  case SDLK_e:
+    key_val = 6;
+    break;
+  case SDLK_r:
+    key_val = 7;
+    break;
+  case SDLK_a:
+    key_val = 8;
+    break;
+  case SDLK_s:
+    key_val = 9;
+    break;
+  case SDLK_d:
+    key_val = 0xa;
+    break;
+  case SDLK_f:
+    key_val = 0xb;
+    break;
+  case SDLK_z:
+    key_val = 0xc;
+    break;
+  case SDLK_x:
+    key_val = 0xd;
+    break;
+  case SDLK_c:
+    key_val = 0xe;
+    break;
+  case SDLK_v:
+    key_val = 0xf;
+    break;
+  }
+  // state->pc += 2;
+
   state->regs[x] = key_val;
 }
 
@@ -257,6 +260,7 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     // Return from a subroutine (function)
     case 0x00ee:
       state->pc = pop(&state->execution_stack);
+      printf("Subroutine returned %d from stack\n", state->pc);
       break;
     }
     break;
@@ -267,16 +271,21 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     break;
   // Execute a subroutine (function)
   case 0x2:
-    push(state->execution_stack, state->pc);
+    printf("Pushing %d onto stack for subroutine\n", state->pc);
+    state->execution_stack = push(state->execution_stack, state->pc);
     state->pc = nnn;
     break;
   case 0x3:
     if (state->regs[x] == nn) {
+      printf("Skipping instruction as state->regs[%d] (%d) == %d\n", x,
+             state->regs[x], nn);
       chip8_skip(state);
     }
     break;
   case 0x4:
     if (state->regs[x] != nn) {
+      printf("Skipping instruction as state->regs[%d] (%d) != %d\n", x,
+             state->regs[x], nn);
       chip8_skip(state);
     }
     break;
@@ -306,6 +315,9 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
   case 0xa:
     state->i = nnn;
     break;
+  // TODO "ambiguous instruction"
+  case 0xb:
+    state->pc = nnn + state->regs[0];
   // Random number generator. TODO Does this work?
   case 0xc:
     state->regs[x] = random() & nn;
@@ -319,6 +331,7 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     if (SDL_PollEvent(&event)) {
       if ((subinst == 0x9e && event.type == SDL_KEYUP) ||
           (subinst == 0xa1 && event.type != SDL_KEYUP)) {
+        printf("skipping instruction\n");
         chip8_skip(state);
       }
     }
@@ -333,9 +346,24 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
       break;
     // Fetch key event
     case 0x0a:
-      chip8_get_key(state);
+      printf("chip8_get_key\n");
+      chip8_get_key(state, x);
       break;
-      // Apparently we have to do this for this
+    // TODO ambiguous instruction
+    case 0x55:
+      // Saves every register to memory
+      for (int i = 0; i <= x; i++) {
+        state->memory[state->i + i] = state->regs[i];
+      }
+      break;
+    // TODO ambiguous instruction
+    case 0x65:
+      printf("Loading registers 0 to %d from memory\n", x);
+      for (int i = 0; i <= x; i++) {
+        printf("state->regs[%d] = state->memory[%d + %d] (%d)\n", i, state->i,
+               i, state->memory[state->i + i]);
+        state->regs[i] = state->memory[state->i + i];
+      }
     }
     break;
   default:
