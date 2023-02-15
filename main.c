@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   state->program_size = CHIP8_LOAD_OFFSET + romfile_len;
   fclose(romfile);
 
-  state->memory[0x1ff] = 2;
+  // state->memory[0x1ff] = 3;
 
   // Main loop
   while (true) {

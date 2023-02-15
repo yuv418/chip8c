@@ -213,9 +213,9 @@ void chip8_dxyn(struct chip8_state_t *state, int x, int y, int n) {
     // Sprite is 8 horizontal bits
     uint8_t sprite = state->memory[state->i + i];
     for (int j = 0; j < 8; j++) {
-      /*if (vx + i > CHIP8_WIDTH) {
+      if (vx + i > CHIP8_WIDTH) {
         break;
-      }*/
+      }
       // Get nth bit of sprite
       uint8_t sprite_bit = (sprite >> (7 - j)) & 1;
 
@@ -225,8 +225,6 @@ void chip8_dxyn(struct chip8_state_t *state, int x, int y, int n) {
           state->regs[0xf] = 1;
         }
         state->display[vy + i][vx + j] ^= sprite_bit;
-        printf("Set display bit at %d %d to %d\n", vy, vx + j,
-               state->display[vy][vx + j]);
       }
     }
   }
