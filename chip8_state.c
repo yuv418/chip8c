@@ -37,6 +37,12 @@ struct chip8_state_t *chip8_state_init() {
   for (int i = 0; i < 16; i++) {
     state->regs[i] = 0;
   }
+  // Clear display state
+  for (int i = 0; i < CHIP8_HEIGHT; i++) {
+    for (int j = 0; j < CHIP8_WIDTH; j++) {
+      state->display[i][j] = 0;
+    }
+  }
   state->execution_stack = NULL;
 
   // Load fonts into memory between 0x50 and 0x9f
@@ -57,16 +63,16 @@ void chip8_get_key(struct chip8_state_t *state, int x) {
   }
   printf("key %d\n", event.key.keysym.sym);
   switch (event.key.keysym.sym) {
-  case SDLK_KP_1:
+  case SDLK_1:
     key_val = 0;
     break;
-  case SDLK_KP_2:
+  case SDLK_2:
     key_val = 1;
     break;
-  case SDLK_KP_3:
+  case SDLK_3:
     key_val = 2;
     break;
-  case SDLK_KP_4:
+  case SDLK_4:
     key_val = 3;
     break;
   case SDLK_q:
@@ -106,9 +112,10 @@ void chip8_get_key(struct chip8_state_t *state, int x) {
     key_val = 0xf;
     break;
   }
-  // state->pc += 2;
+  //  state->pc += 2;
 
   state->regs[x] = key_val;
+  printf("state->regs[%d] (%d) = %d", x, state->regs[x], key_val);
 }
 
 void chip8_state_free(struct chip8_state_t *state) {
@@ -128,8 +135,12 @@ void chip8_8xyi(struct chip8_state_t *state, int x, int y, int i) {
   // Last nibble of inst
   printf("last nibble of 0x8 inst is %d\n", i);
   switch (i) {
+  // VX = VY
   case 0x0:
+    printf("state->regs[%d] (%d) = state->regs[%d] (%d)\n", x, state->regs[x],
+           y, state->regs[y]);
     state->regs[x] = state->regs[y];
+    break;
   // VX = VX | VY
   case 0x1:
     // I realize that I can do state->regs[x] |= state->regs[y] but this is
@@ -146,7 +157,14 @@ void chip8_8xyi(struct chip8_state_t *state, int x, int y, int i) {
     break;
   // VX = VX + VY
   case 0x4:
+    // Set carry flag if overflow
+    if (255 - state->regs[y] < state->regs[x]) {
+      state->regs[0xf] = 1;
+    }
     state->regs[x] = state->regs[x] + state->regs[y];
+
+    // CARRY FLAG
+    // if (state -)
     break;
   // VX = VX - VY
   case 0x5:
@@ -165,8 +183,9 @@ void chip8_8xyi(struct chip8_state_t *state, int x, int y, int i) {
   // TODO the following two may have BUGS.
   // Right shift
   case 0x6:
+    // TODO broken
     state->regs[x] = state->regs[y];
-    state->regs[0xf] = state->regs[x] & 1;
+    state->regs[0xf] = ((state->regs[x] >> 1) << 1) != state->regs[x];
     state->regs[x] = state->regs[x] >> 1;
     break;
   // Left shift
@@ -185,26 +204,31 @@ void chip8_dxyn(struct chip8_state_t *state, int x, int y, int n) {
   // 64
   uint16_t vx = state->regs[x] % 64;
   uint16_t vy = state->regs[y] % 32;
-  state->regs[0xf] = 1;
+  state->regs[0xf] = 0;
+
   printf("vx, vy, n %d %d %d\n", vx, vy, n);
   printf("i reg 0x%x\n", state->i);
   // Draw n tall pixels
   for (int i = state->i; i < state->i + n; i++) {
     // Sprite is 8 horizontal bits
-    int xvx = vx;
     uint8_t sprite = state->memory[i];
-    for (int j = 7; j >= 0; j--) {
-      if (xvx > CHIP8_WIDTH) {
-        break;
-      }
-      // Get nth bit of sprite
-      bool sprite_bit = (sprite >> (j)) & 1;
+    for (int j = 0; j < 8; j++) {
+      /* if (vx + i > CHIP8_WIDTH) { */
+      /*   break; */
+      /* } */
+      /* // Get nth bit of sprite */
+      // bool sprite_bit = (sprite >> (7 - j)) & 1;
+      uint8_t sprite_bit = sprite & (0x80 >> j);
 
       // If the sprite has an "on" pixel, flip the display bit
       if (sprite_bit) {
-        state->display[vy][xvx] = !state->display[vy][xvx];
+        if (state->display[vy][vx + j]) {
+          state->regs[0xf] = 1;
+        }
+        state->display[vy][vx + j] ^= 1;
+        printf("Set display bit at %d %d to %d\n", vy, vx + j,
+               state->display[vy][vx + j]);
       }
-      xvx++;
     }
     vy++;
   }
@@ -298,9 +322,11 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     if (state->regs[x] != state->regs[y]) {
       chip8_skip(state);
     }
+    break;
 
   // Set register X to NN
   case 0x6:
+    printf("Setting state->regs[%d] (%d) = %d\n", x, state->regs[x], nn);
     state->regs[x] = nn;
     break;
   // Add NN to value of X.
@@ -309,7 +335,8 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     break;
   // Arithmetic handlers
   case 0x8:
-    chip8_8xyi(state, x, y, inst & 0x000f);
+    printf("Arithmetic instruction called!\n");
+    chip8_8xyi(state, x, y, n);
     break;
   // Set the I register to NNN
   case 0xa:
@@ -328,6 +355,7 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
   case 0xe: {
     int subinst = inst & 0x00ff;
     SDL_Event event;
+    printf("subinst is 0x%x\n", subinst);
     if (SDL_PollEvent(&event)) {
       if ((subinst == 0x9e && event.type == SDL_KEYUP) ||
           (subinst == 0xa1 && event.type != SDL_KEYUP)) {
@@ -364,6 +392,26 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
                i, state->memory[state->i + i]);
         state->regs[i] = state->memory[state->i + i];
       }
+    case 0x33: {
+      uint8_t vx = state->regs[x];
+      // This is a bad implementation
+      if (vx < 100) {
+        // Tens
+        state->memory[state->i] = vx / 10;
+        // Ones
+        state->memory[state->i + 1] = vx % 10;
+      } else if (vx < 10) {
+        // Ones
+        state->memory[state->i + 1] = vx;
+      } else {
+        // Hundreds
+        state->memory[state->i] = vx / 100;
+        // Tens
+        state->memory[state->i + 1] = (vx % 100) / 10;
+        // Ones
+        state->memory[state->i + 2] = vx % 10;
+      }
+    }
     }
     break;
   default:
