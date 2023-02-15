@@ -209,28 +209,26 @@ void chip8_dxyn(struct chip8_state_t *state, int x, int y, int n) {
   printf("vx, vy, n %d %d %d\n", vx, vy, n);
   printf("i reg 0x%x\n", state->i);
   // Draw n tall pixels
-  for (int i = state->i; i < state->i + n; i++) {
+  for (int i = 0; i < n; i++) {
     // Sprite is 8 horizontal bits
-    uint8_t sprite = state->memory[i];
+    uint8_t sprite = state->memory[state->i + i];
     for (int j = 0; j < 8; j++) {
-      /* if (vx + i > CHIP8_WIDTH) { */
-      /*   break; */
-      /* } */
-      /* // Get nth bit of sprite */
-      // bool sprite_bit = (sprite >> (7 - j)) & 1;
-      uint8_t sprite_bit = sprite & (0x80 >> j);
+      /*if (vx + i > CHIP8_WIDTH) {
+        break;
+      }*/
+      // Get nth bit of sprite
+      uint8_t sprite_bit = (sprite >> (7 - j)) & 1;
 
       // If the sprite has an "on" pixel, flip the display bit
       if (sprite_bit) {
-        if (state->display[vy][vx + j]) {
+        if (state->display[vy + i][vx + j]) {
           state->regs[0xf] = 1;
         }
-        state->display[vy][vx + j] ^= 1;
+        state->display[vy + i][vx + j] ^= sprite_bit;
         printf("Set display bit at %d %d to %d\n", vy, vx + j,
                state->display[vy][vx + j]);
       }
     }
-    vy++;
   }
 }
 bool chip8_instruction_decode(struct chip8_state_t *state) {
@@ -279,7 +277,11 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     switch (inst) {
       // Clear screen
     case 0x00e0:
-      SDL_FillRect(state->surface, NULL, 0x000000);
+      for (int i = 0; i < CHIP8_WIDTH; i++) {
+        for (int j = 0; j < CHIP8_HEIGHT; j++) {
+          state->display[j][i] = 0;
+        }
+      }
       break;
     // Return from a subroutine (function)
     case 0x00ee:
