@@ -34,6 +34,8 @@ typedef struct chip8_state_t {
   uint16_t program_size;
   // the stack.
   struct stack_t *execution_stack;
+  // current keycode
+  uint8_t key_code;
 } chip8_state;
 
 static uint8_t chip8_font[] = {

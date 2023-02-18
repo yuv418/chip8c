@@ -7,6 +7,7 @@ uint16_t pop(struct stack_t **head) {
     struct stack_t *old_node = *head;
     uint16_t old_data = old_node->data;
     (*head) = old_node->next;
+    free(old_node);
     return old_data;
   } else {
     // TODO: Shouldn't this be the base address,

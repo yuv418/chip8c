@@ -34,6 +34,7 @@ struct chip8_state_t *chip8_state_init() {
   state->i = 0x0;
   state->delay_timer = 0x0;
   state->sound_timer = 0x0;
+  state->key_code = 0x10;
   for (int i = 0; i < 16; i++) {
     state->regs[i] = 0;
   }
@@ -52,28 +53,20 @@ struct chip8_state_t *chip8_state_init() {
   return state;
 }
 
-void chip8_get_key(struct chip8_state_t *state, int x) {
-  SDL_Event event;
-  // Because this doesn't increment the program counter, or something
-  // state->pc -= 2;
-  uint8_t key_val = 0x0;
-  while (event.type != SDL_KEYUP) {
-    SDL_WaitEvent(&event);
-    printf("Event handled\n");
-  }
-  printf("key %d\n", event.key.keysym.sym);
-  switch (event.key.keysym.sym) {
+uint8_t chip8_key_switch(SDL_KeyCode keycode) {
+  uint8_t key_val = 0x10;
+  switch (keycode) {
   case SDLK_1:
-    key_val = 0;
-    break;
-  case SDLK_2:
     key_val = 1;
     break;
-  case SDLK_3:
+  case SDLK_2:
     key_val = 2;
     break;
-  case SDLK_4:
+  case SDLK_3:
     key_val = 3;
+    break;
+  case SDLK_4:
+    key_val = 0xc;
     break;
   case SDLK_q:
     key_val = 4;
@@ -85,37 +78,53 @@ void chip8_get_key(struct chip8_state_t *state, int x) {
     key_val = 6;
     break;
   case SDLK_r:
-    key_val = 7;
-    break;
-  case SDLK_a:
-    key_val = 8;
-    break;
-  case SDLK_s:
-    key_val = 9;
-    break;
-  case SDLK_d:
-    key_val = 0xa;
-    break;
-  case SDLK_f:
-    key_val = 0xb;
-    break;
-  case SDLK_z:
-    key_val = 0xc;
-    break;
-  case SDLK_x:
     key_val = 0xd;
     break;
-  case SDLK_c:
+  case SDLK_a:
+    key_val = 7;
+    break;
+  case SDLK_s:
+    key_val = 8;
+    break;
+  case SDLK_d:
+    key_val = 9;
+    break;
+  case SDLK_f:
     key_val = 0xe;
+    break;
+  case SDLK_z:
+    key_val = 0xa;
+    break;
+  case SDLK_x:
+    key_val = 0x0;
+    break;
+  case SDLK_c:
+    key_val = 0xb;
     break;
   case SDLK_v:
     key_val = 0xf;
     break;
+  default:
+    key_val = 0x10;
+    break;
   }
-  //  state->pc += 2;
+  return key_val;
+}
 
+void chip8_get_key(struct chip8_state_t *state, int x) {
+  SDL_Event event;
+  // Because this doesn't increment the program counter, or something
+  // state->pc -= 2;
+  while (event.type != SDL_KEYUP) {
+    SDL_WaitEvent(&event);
+    printf("Event handled\n");
+  }
+  printf("key %d\n", event.key.keysym.sym);
+
+  uint8_t key_val = chip8_key_switch(event.key.keysym.sym);
   state->regs[x] = key_val;
-  printf("state->regs[%d] (%d) = %d", x, state->regs[x], key_val);
+
+  printf("state->regs[%d] (%d) = %d\n", x, state->regs[x], key_val);
 }
 
 void chip8_state_free(struct chip8_state_t *state) {
@@ -133,18 +142,18 @@ void chip8_skip(struct chip8_state_t *state) { state->pc += 2; }
 void chip8_8xyi(struct chip8_state_t *state, int x, int y, int i) {
 
   // Last nibble of inst
-  printf("last nibble of 0x8 inst is %d\n", i);
+  // printf("last nibble of 0x8 inst is %d\n", i);
   switch (i) {
   // VX = VY
   case 0x0:
-    printf("state->regs[%d] (%d) = state->regs[%d] (%d)\n", x, state->regs[x],
-           y, state->regs[y]);
+    // printf("state->regs[%d] (%d) = state->regs[%d] (%d)\n", x,
+    // state->regs[x],y, state->regs[y]);
     state->regs[x] = state->regs[y];
     break;
   // VX = VX | VY
   case 0x1:
-    // I realize that I can do state->regs[x] |= state->regs[y] but this is
-    // more literate.
+    // I realize that I can do state->regs[x] |= state->regs[y] but this
+    // is more literate.
     state->regs[x] = state->regs[x] | state->regs[y];
     break;
   // VX = VX & VY
@@ -183,7 +192,6 @@ void chip8_8xyi(struct chip8_state_t *state, int x, int y, int i) {
   // TODO the following two may have BUGS.
   // Right shift
   case 0x6:
-    // TODO broken
     state->regs[x] = state->regs[y];
     state->regs[0xf] = ((state->regs[x] >> 1) << 1) != state->regs[x];
     state->regs[x] = state->regs[x] >> 1;
@@ -230,6 +238,20 @@ void chip8_dxyn(struct chip8_state_t *state, int x, int y, int n) {
   }
 }
 bool chip8_instruction_decode(struct chip8_state_t *state) {
+
+  SDL_Event event;
+  SDL_PollEvent(&event);
+  if (event.key.keysym.sym) {
+    printf("keycode before translation is %d\n", event.key.keysym.sym);
+  }
+  if (event.type == SDL_KEYDOWN) {
+    state->key_code = chip8_key_switch(event.key.keysym.sym);
+  } else if (event.type == SDL_KEYUP) {
+    if (state->key_code == chip8_key_switch(event.key.keysym.sym)) {
+      state->key_code = 0x10;
+    }
+  }
+
   // REMOVE THIS (also it looks to not even work right)
   // printf("%d , %d\n", state->pc, state->program_size);
   if (state->pc > state->program_size) {
@@ -326,7 +348,8 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
 
   // Set register X to NN
   case 0x6:
-    printf("Setting state->regs[%d] (%d) = %d\n", x, state->regs[x], nn);
+    // printf("Setting state->regs[%d] (%d) = %d\n", x, state->regs[x],
+    // nn);
     state->regs[x] = nn;
     break;
   // Add NN to value of X.
@@ -335,7 +358,7 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     break;
   // Arithmetic handlers
   case 0x8:
-    printf("Arithmetic instruction called!\n");
+    // printf("Arithmetic instruction called!\n");
     chip8_8xyi(state, x, y, n);
     break;
   // Set the I register to NNN
@@ -354,15 +377,22 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     break;
   case 0xe: {
     int subinst = inst & 0x00ff;
-    SDL_Event event;
-    printf("subinst is 0x%x\n", subinst);
-    if (SDL_PollEvent(&event)) {
-      if ((subinst == 0x9e && event.type == SDL_KEYUP) ||
-          (subinst == 0xa1 && event.type != SDL_KEYUP)) {
-        printf("skipping instruction\n");
+
+    // printf("value of vx is %d\n", state->regs[x]);
+
+    if (subinst == 0x9e) {
+      if (state->regs[x] == state->key_code) {
+        printf("0x9e: skipping instruction\n");
+        chip8_skip(state);
+      }
+    } else if (subinst == 0xa1) {
+      // printf("In 0xa1 case handler\n");
+      if (state->regs[x] != state->key_code) {
+        // printf("0xa1: skipping instruction\n");
         chip8_skip(state);
       }
     }
+
     break;
   }
 
@@ -371,6 +401,7 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     // Add X to i register
     case 0x1e:
       state->i = state->i + state->regs[x];
+      // vf flag?
       break;
     // Fetch key event
     case 0x0a:
@@ -380,7 +411,10 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     // TODO ambiguous instruction
     case 0x55:
       // Saves every register to memory
+      printf("Saving registers 0 to %d from memory\n", x);
       for (int i = 0; i <= x; i++) {
+        printf("state->memory[%d + %d] (%d) = state->regs[%d]\n", state->i, i,
+               state->memory[state->i + i], i);
         state->memory[state->i + i] = state->regs[i];
       }
       break;
@@ -392,6 +426,7 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
                i, state->memory[state->i + i]);
         state->regs[i] = state->memory[state->i + i];
       }
+      break;
     case 0x33: {
       uint8_t vx = state->regs[x];
       // This is a bad implementation
@@ -422,6 +457,7 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
 
 void chip8_draw_screen(struct chip8_state_t *state) {
   // 10x10 pixel
+  // printf("chip8: drawing screen\n");
   SDL_Rect pixel = {0, 0, 10, 10};
   for (int i = 0; i < 64; i++) {
     for (int j = 0; j < 32; j++) {
@@ -439,6 +475,7 @@ void chip8_draw_screen(struct chip8_state_t *state) {
 
 bool chip8_handle_event(struct chip8_state_t *state) {
   SDL_Event ev;
+  printf("Polled event\n");
   SDL_PollEvent(&ev);
   switch (ev.type) {
   case SDL_KEYDOWN:
