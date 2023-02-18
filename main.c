@@ -33,11 +33,10 @@ int main(int argc, char **argv) {
   // Main loop
   while (true) {
     // Fetch decode execute
-    chip8_instruction_decode(state);
-    chip8_draw_screen(state);
-    /*if (!chip8_handle_event(state)) {
+    if (!chip8_instruction_decode(state)) {
       break;
-    }*/
+    }
+    chip8_draw_screen(state);
     // 700 instructions per second
     usleep(1.0 / 700.0);
   }

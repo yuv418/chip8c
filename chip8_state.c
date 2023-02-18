@@ -245,7 +245,14 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
     printf("keycode before translation is %d\n", event.key.keysym.sym);
   }
   if (event.type == SDL_KEYDOWN) {
+    if (event.key.keysym.sym == SDLK_ESCAPE) {
+      return false;
+    }
     state->key_code = chip8_key_switch(event.key.keysym.sym);
+  } else if (event.type == SDL_WINDOWEVENT) {
+    if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
+      return false;
+    }
   } else if (event.type == SDL_KEYUP) {
     if (state->key_code == chip8_key_switch(event.key.keysym.sym)) {
       state->key_code = 0x10;
@@ -266,7 +273,7 @@ bool chip8_instruction_decode(struct chip8_state_t *state) {
   state->pc += 2;
 
   if (inst != 0x1228) {
-    printf("Instruction: 0x%04x\n", inst);
+    // printf("Instruction: 0x%04x\n", inst);
   }
 
   // Extract x, y, n, and nnn from the opcode. These will always be in the
